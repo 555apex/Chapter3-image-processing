@@ -1,0 +1,22 @@
+{
+  "started_utc": "2026-09-30T08:08:34.706005+00:00",
+  "python": "3.13.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+  "torch": "2.7.1+cu128",
+  "cuda": "12.8",
+  "device": "0",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "fallback_reason": null,
+  "inference_precision": "float32",
+  "timing": "synchronous one-image inference, including preprocessing, NMS, and transfer; excludes disk I/O",
+  "versions": {
+    "ultralytics": "8.4.166",
+    "opencv-python": "5.0.0.93",
+    "numpy": "2.3.3",
+    "scikit-image": "0.26.0",
+    "pycocotools": "2.0.11"
+  },
+  "model_sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1",
+  "fingerprint": "12246ba7577ed58cef665d01aae647570b7c984a3f3862d31c195095fa849f4d"
+}

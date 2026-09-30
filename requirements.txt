@@ -1,0 +1,10 @@
+ultralytics==8.4.166
+opencv-python==5.0.0.93
+numpy==2.3.3
+scikit-image==0.26.0
+pycocotools==2.0.11
+matplotlib==3.11.2
+requests==2.32.5
+reportlab==5.0.1
+Pillow==12.3.0
+PyMuPDF==1.28.2

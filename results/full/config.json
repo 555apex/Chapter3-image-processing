@@ -1,0 +1,48 @@
+{
+  "data_dir": "data",
+  "output_dir": "results/full",
+  "model": "models/yolo11n.pt",
+  "sample_count": 128,
+  "sample_seed": 20260930,
+  "max_side": 640,
+  "image_size": 640,
+  "device": "auto",
+  "inference_confidence": 0.001,
+  "report_confidence": 0.25,
+  "nms_iou": 0.7,
+  "max_detections": 100,
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "gaussian_sigmas": [
+    10,
+    25,
+    50
+  ],
+  "salt_pepper_probabilities": [
+    0.01,
+    0.03,
+    0.05
+  ],
+  "methods": [
+    "none",
+    "mean",
+    "gaussian",
+    "median",
+    "bilateral",
+    "nlm"
+  ],
+  "filters": {
+    "kernel": 3,
+    "gaussian_sigma": 1,
+    "bilateral_d": 5,
+    "sigma_color": 25,
+    "sigma_space": 25,
+    "nlm_h": 10,
+    "nlm_h_color": 10,
+    "template_window": 7,
+    "search_window": 21
+  }
+}
