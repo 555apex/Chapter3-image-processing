@@ -1,0 +1,34 @@
+{
+  "checked_date": "2026-09-30",
+  "papers": [
+    {
+      "file": "DCP-SFR_2026.pdf",
+      "sha256": "509b97b2673e5aca577a4ff62f0ba05b78aee90c073c514c87331a23138fb266",
+      "pages": 10,
+      "publication_checked": true
+    },
+    {
+      "file": "UniRestore_2025.pdf",
+      "sha256": "1b2cc178a2dae7c160ba484160206145329434d531f7086d8b78f1b19cf379fa",
+      "pages": 11,
+      "publication_checked": true
+    },
+    {
+      "file": "UniRestore_arxiv.pdf",
+      "sha256": "d8feb1445da236688f7c033059265f2c2b972f210e839e8f4639c2b6032bdef7",
+      "pages": 11,
+      "publication_checked": false
+    },
+    {
+      "file": "UniRestore_supplement.pdf",
+      "sha256": "213ff46837b6b4ca8944b570559744f5d035a9f9d63363bff100813f6f289fb2",
+      "pages": 7,
+      "publication_checked": true
+    }
+  ],
+  "source_urls": [
+    "https://openaccess.thecvf.com/content/CVPR2026/html/Jiang_Defect_Cue-Preserved_Structural_Feature_Refinement_for_Few-Shot_Anomaly_Detection_CVPR_2026_paper.html",
+    "https://openaccess.thecvf.com/content/CVPR2025/html/Chen_UniRestore_Unified_Perceptual_and_Task-Oriented_Image_Restoration_Model_Using_Diffusion_CVPR_2025_paper.html",
+    "https://openaccess.thecvf.com/content/CVPR2025/supplemental/Chen_UniRestore_Unified_Perceptual_CVPR_2025_supplemental.pdf"
+  ]
+}
