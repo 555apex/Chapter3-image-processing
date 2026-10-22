@@ -15,4 +15,4 @@
 
 重新生成PDF：安装requirements.txt后，在本目录运行python tools/md_to_pdf.py report.md report.pdf。Windows默认嵌入宋体；其他系统用--font指定支持中文的TrueType字体。
 
-作业2位于hw2-opencv-denoising-detection分支。当前成果供本地审阅，审阅通过并收到提交说明后再推送。
+作业2位于hw2-opencv-denoising-detection分支。
