@@ -11,6 +11,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", help="Override output folder (keep practice separate)")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
+    # 练习使用独立输出目录，正式记录保留在配置指定的位置。
     if args.output:
         config["output_dir"] = args.output
     run(config, args.limit, args.condition_limit)

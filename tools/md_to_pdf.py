@@ -138,7 +138,6 @@ def render(source, target, font=None):
         canvas.drawRightString(A4[0]-48, A4[1]-29, title[:28])
         canvas.setStrokeColor(colors.HexColor("#D3DDE6"))
         canvas.line(48, 41, A4[0]-48, 41)
-        canvas.drawString(48, 28, "2026年9月30日 · 可追溯与可复现")
         canvas.drawRightString(A4[0]-48, 28, str(doc.page))
         canvas.restoreState()
     doc = SimpleDocTemplate(str(target), pagesize=A4, leftMargin=48, rightMargin=48,

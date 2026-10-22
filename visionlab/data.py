@@ -19,6 +19,7 @@ WEIGHT_SHA256 = "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee
 def save_json(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    # 写完临时文件再替换，避免程序中断后留下半份JSON。
     temporary = path.with_suffix(path.suffix + ".part")
     temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
     temporary.replace(path)
@@ -84,6 +85,7 @@ def prepare(config):
         with zipfile.ZipFile(RangeReader(ANNOTATION_URL)) as z:
             ann_path.write_bytes(z.read("annotations/instances_val2017.json"))
     original = json.loads(ann_path.read_text(encoding="utf-8"))
+    # 抽样前固定排序，避免源标注的排列变化影响选中的图像。
     images = sorted(original["images"], key=lambda x: x["id"])
     ids = np.random.default_rng(config["sample_seed"]).choice(
         len(images), size=config["sample_count"], replace=False)
@@ -95,6 +97,7 @@ def prepare(config):
         path = root / "original" / im["file_name"]
         download(url, path, image=True)
         return im, path, url
+    # 下载可并发；map仍按输入顺序返回，后续图像与标注顺序保持一致。
     with cf.ThreadPoolExecutor(max_workers=8) as pool:
         fetched = list(pool.map(get_image, selected))
     processed_images, transforms, manifest = [], {}, []
@@ -115,6 +118,7 @@ def prepare(config):
         })
     anns = []
     for a in selected_anns:
+        # 宽高取整后，横纵缩放比例可能略有差异；框与面积分别同步缩放。
         sx, sy = transforms[a["image_id"]]
         x, y, w, h = a["bbox"]
         anns.append({k: v for k, v in a.items() if k not in ["segmentation", "bbox", "area"]} |
@@ -136,6 +140,7 @@ def prepare(config):
                 download(WEIGHT_API, config["model"], headers={"Accept": "application/octet-stream"})
             except requests.RequestException:
                 download(WEIGHT_MIRROR, config["model"])
+    # 所有下载来源都必须通过同一权重校验，防止模型版本悄然变化。
     if sha256(config["model"]) != WEIGHT_SHA256:
         raise ValueError("Unexpected model checksum; use the fixed official YOLO11n v8.3.0 asset")
     print(f"Prepared {len(selected)} images, {len(anns)} annotations; weights {sha256(config['model'])}", flush=True)

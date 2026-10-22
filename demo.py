@@ -40,6 +40,7 @@ def main():
         return
     if args.kernel:
         config["filters"]["kernel"] = args.kernel
+    # 所有滤波器共享同一份noisy；核心函数返回新图，不覆盖输入。
     outputs = {method: denoise(noisy, method, config["filters"]) for method in config["methods"]}
     quality = {}
     for method, processed in outputs.items():
@@ -48,6 +49,7 @@ def main():
     save_json(output / "quality.json", quality)
     if args.stage == "denoise":
         return
+    # 只有detect阶段加载模型，前几个阶段可单独观察图像处理结果。
     detector = Detector(config, truth["categories"])
     annotations = [a for a in truth["annotations"] if a["image_id"] == image["id"]]
     records = {}

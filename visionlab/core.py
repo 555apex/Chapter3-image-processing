@@ -36,6 +36,7 @@ def write_image(path, image):
 def resize_image(image, max_side=640):
     """No upsampling. Return exact independent x/y annotation scale factors."""
     height, width = image.shape[:2]
+    # 只缩小大图，避免上采样引入额外插值；标注比例用取整后的尺寸计算。
     scale = min(1.0, max_side / max(height, width))
     new_w, new_h = max(1, round(width * scale)), max(1, round(height * scale))
     resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA) if scale < 1 else image.copy()
@@ -43,16 +44,19 @@ def resize_image(image, max_side=640):
 
 def add_noise(image, kind, level, seed, image_id):
     """Stable per-image random stream; seed never depends on method or Python hash."""
+    # 随机键不含滤波方法，保证各方法拿到相同的带噪输入。
     key = f"{seed}|{image_id}|{kind}|{level}".encode("ascii")
     rng = np.random.default_rng(int.from_bytes(hashlib.sha256(key).digest()[:8], "little"))
     if kind == "clean":
         return image.copy()
     if kind == "gaussian":
+        # 先转浮点再相加，防止uint8溢出；最后裁剪回合法像素范围。
         noise = rng.normal(0.0, float(level), image.shape)
         return np.rint(np.clip(image.astype(np.float32) + noise, 0, 255)).astype(np.uint8)
     if kind == "salt_pepper":
         if not 0 <= float(level) <= 1:
             raise ValueError("Salt-and-pepper probability must be in [0, 1]")
+        # 每个空间位置抽一次随机数，三个通道同时置黑或置白。
         draw = rng.random(image.shape[:2])
         noisy = image.copy()
         noisy[draw < level / 2] = 0
@@ -61,6 +65,7 @@ def add_noise(image, kind, level, seed, image_id):
     raise ValueError(f"Unknown noise: {kind}")
 
 def denoise(image, method, parameters=None):
+    # 练习参数覆盖默认值，不直接修改全局参数字典。
     p = {**DEFAULT_FILTERS, **(parameters or {})}
     kernel = int(p["kernel"])
     if kernel < 1 or kernel % 2 == 0:
@@ -84,6 +89,7 @@ def image_quality(clean, processed):
     if clean.shape != processed.shape:
         raise ValueError("Quality inputs must have the same shape")
     mse = float(np.mean((clean.astype(np.float64) - processed.astype(np.float64)) ** 2))
+    # 完全相同的图像PSNR为正无穷；用None保存，避免非标准JSON数值。
     psnr = None if mse == 0 else float(10 * np.log10(255 ** 2 / mse))
     ssim = float(structural_similarity(clean, processed, data_range=255, channel_axis=2))
     return {"psnr_db": psnr, "ssim": ssim, "mse": mse}
@@ -101,10 +107,12 @@ class Detector:
         requested = config.get("device", "auto")
         self.device = ("0" if torch.cuda.is_available() else "cpu") if requested == "auto" else requested
         self.model = YOLO(config["model"])
+        # YOLO类别从0连续编号，COCO类别ID有缺号，必须按官方类别顺序映射。
         self.category_ids = [c["id"] for c in sorted(categories, key=lambda c: c["id"])]
         if len(self.category_ids) != 80:
             raise ValueError("YOLO COCO weights require the complete 80-category mapping")
         self.device_fallback = None
+        # 完整推理预热既检查设备兼容性，也排除首次加载对正式计时的影响。
         dummy = np.zeros((320, 320, 3), dtype=np.uint8)
         try:
             for _ in range(3):
@@ -120,6 +128,7 @@ class Detector:
     def predict(self, image, image_id):
         if self.device != "cpu":
             self.torch.cuda.synchronize()
+        # CUDA异步执行，计时区间前后都需同步，才能记录实际推理耗时。
         start = time.perf_counter()
         result = self.model.predict(
             source=image, imgsz=self.config["image_size"], device=self.device,
@@ -134,6 +143,7 @@ class Detector:
             self.torch.cuda.synchronize()
         elapsed = (time.perf_counter() - start) * 1000
         predictions = []
+        # 模型已把框映射回输入图坐标；这里只将xyxy转换为COCO的xywh。
         for (x1, y1, x2, y2), score, cls in zip(boxes, scores, classes):
             predictions.append({
                 "image_id": int(image_id), "category_id": self.category_ids[cls],

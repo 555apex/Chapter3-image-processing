@@ -15,6 +15,7 @@ from .data import save_json, sha256
 from .evaluation import evaluate
 
 def conditions(config):
+    # 干净图对照不依赖随机种子，每种滤波方法只运行一次。
     for method in config["methods"]:
         yield {"noise": "clean", "level": 0, "seed": 0, "method": method}
     for noise, levels in [("gaussian", config["gaussian_sigmas"]),
@@ -41,6 +42,7 @@ def run(config, limit=None, condition_limit=None):
     detector = Detector(config, truth["categories"])
     import torch
     torch.set_num_threads(4)
+    # 输入、权重、设备或源文件变化后拒绝续跑，避免把不同实验混在一起。
     fingerprint_inputs = {
         "config": config, "image_ids": sorted(ids), "model_sha256": sha256(config["model"]),
         "device": detector.device,
@@ -86,6 +88,7 @@ def run(config, limit=None, condition_limit=None):
         for im in images:
             image_id = im["id"]
             clean = clean_images[image_id]
+            # 每个条件从干净图重新加噪，不在上一种方法的输出上继续处理。
             noisy = add_noise(clean, c["noise"], c["level"], c["seed"], image_id)
             start = time.perf_counter()
             processed = denoise(noisy, c["method"], config["filters"])
@@ -98,6 +101,7 @@ def run(config, limit=None, condition_limit=None):
                 "detection_ms": detection_ms, "predictions": predictions,
                 "processed_sha256": hashlib.sha256(processed.tobytes()).hexdigest(),
             })
+        # AP需要收集整个子集的预测后统一计算，不能对单图AP取平均。
         metrics = evaluate(truth, all_predictions, config["report_confidence"])
         image_counts = metrics.pop("per_image_counts")
         for row in rows:
@@ -117,6 +121,7 @@ def run(config, limit=None, condition_limit=None):
         temp = records_path.with_suffix(".part")
         with gzip.open(temp, "wt", encoding="utf-8", compresslevel=6) as f:
             json.dump(rows, f, ensure_ascii=False, allow_nan=False)
+        # 逐图记录完整落盘后才写条件摘要，保证断点恢复时两者齐全。
         temp.replace(records_path)
         save_json(checkpoint, summary)
         results.append(summary)
@@ -137,6 +142,7 @@ def run(config, limit=None, condition_limit=None):
         for metric in numeric:
             numbers = [v[metric] for v in values if v[metric] is not None]
             row[metric + "_mean"] = float(np.mean(numbers)) if numbers else None
+            # 三个种子使用样本标准差；干净对照只有一次运行，记为0。
             row[metric + "_std"] = float(np.std(numbers, ddof=1)) if len(numbers) > 1 else (0.0 if numbers else None)
         aggregates.append(row)
     save_json(output / "aggregate_results.json", aggregates)
