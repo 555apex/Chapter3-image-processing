@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from skimage.metrics import structural_similarity
 
+# 固定OpenCV线程数，减少不同运行的CPU并行度差异。
 cv2.setNumThreads(1)
 DEFAULT_FILTERS = {
     "kernel": 3, "gaussian_sigma": 1, "bilateral_d": 5,
@@ -141,6 +142,7 @@ class Detector:
         classes = result.boxes.cls.cpu().numpy().astype(int)
         if self.device != "cpu":
             self.torch.cuda.synchronize()
+        # 计时到CPU/NumPy结果就绪为止；下方字典组装不计入检测耗时。
         elapsed = (time.perf_counter() - start) * 1000
         predictions = []
         # 模型已把框映射回输入图坐标；这里只将xyxy转换为COCO的xywh。

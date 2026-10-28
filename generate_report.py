@@ -105,7 +105,7 @@ def make_plots(aggregate, figdir):
     times = [[r["denoise_ms_mean"] for r in aggregate if r["method"]==m] for m in METHODS]
     axes[1].bar(x,[np.mean(t) for t in times],color=COLORS)
     axes[1].set_ylabel("去噪平均耗时（ms/张）")
-    # NLM can dominate; log1p avoids hiding the inexpensive methods and handles zero.
+    # NLM耗时远高于其他方法；symlog保留零附近的线性区间，便于同时查看各方法。
     axes[1].set_yscale("symlog",linthresh=1)
     for ax in axes:
         ax.set_xticks(x,[METHOD_NAMES[m] for m in METHODS],rotation=20)
@@ -284,6 +284,7 @@ def main(inp, output, pdf=True):
                           f'{(best["map50_95_mean"]-base)*100:+.2f}',METHOD_NAMES[qbest["method"]]])
     timings=[]
     for method in METHODS:
+        # 每种方法有1个干净组和6个噪声组；噪声组已先汇总三个种子，这里再按组同权平均。
         rows=[r for r in aggregate if r["method"]==method]
         dm=float(np.mean([r["denoise_ms_mean"] for r in rows]))
         im=float(np.mean([r["detection_ms_mean"] for r in rows]))
@@ -318,7 +319,7 @@ def main(inp, output, pdf=True):
 
 $$Y=\\mathrm{{round}}\\left(\\mathrm{{clip}}(X+\\epsilon,0,255)\\right),\\quad \\epsilon\\sim\\mathcal{{N}}(0,\\sigma_n^2)$$
 
-σ_n取10、25、50。靠近0或255处裁剪会改变实际扰动分布，记录的是裁剪前高斯噪声参数，不声称裁剪后仍严格服从相同高斯分布。
+σ_n取10、25、50。靠近0或255处裁剪会改变实际扰动分布，这里的σ_n描述裁剪前的噪声；裁剪后，靠近像素范围边界的扰动分布会发生变化。
 
 椒盐噪声按像素位置抽一个u∈[0,1)，u<p/2时三个通道同时置0，p/2≤u<p时置255，其余保留原像素。p取0.01、0.03、0.05，是期望污染位置比例，有限图像中的实际比例会波动。两个模型均是合成退化，不代表真实相机全部噪声。
 
@@ -358,7 +359,7 @@ $$\\hat{{X}}(p)=\\frac{{\\sum_q w_s(p,q)w_c(p,q)Y(q)}}{{\\sum_q w_s(p,q)w_c(p,q)
 
 $$\\hat{{X}}(p)=\\sum_q w(p,q)Y(q),\\quad w(p,q)\\propto\\exp\\left(-\\frac{{d(P_p,P_q)}}{{h^2}}\\right)$$
 
-这是解释机理的简化表达；OpenCV彩色实现内部转到Lab并分别处理亮度与颜色，采用快速算法。本作业调用fastNlMeansDenoisingColored，不将简式冒充完整底层实现。相似纹理有利于平均抑噪；h过强会损失细节，h固定而噪声很强时又可能去除不足。搜索窗口较大使其耗时明显增加。
+这是解释机理的简化表达；OpenCV彩色实现内部转到Lab并分别处理亮度与颜色，采用快速算法。本实验调用fastNlMeansDenoisingColored完成处理，以上公式仅用于说明其加权思想。相似纹理有利于平均抑噪；h过强会损失细节，h固定而噪声很强时又可能去除不足。搜索窗口较大使其耗时明显增加。
 
 | 方法 | 本实验固定参数 | 主要取舍 |
 |---|---|---|
@@ -409,7 +410,7 @@ mAP@0.5与mAP@0.5:0.95使用官方pycocotools.COCOeval bbox、101点召回插值
 
 固定阈值Precision=TP/(TP+FP)、Recall=TP/(TP+FN)、F1=2PR/(P+R)，在置信度≥0.25、IoU≥0.5下按COCO逐类别匹配，合并所有图像计算micro指标。重复预测只允许一个匹配同一普通真值，错类别不能匹配；crowd忽略项不作为FP/FN。先每种子计算整个子集指标，再对三个种子取均值与样本标准差（ddof=1），不是对逐图AP平均。
 
-去噪时间仅覆盖滤波调用；检测时间包含预处理、推理、NMS、结果转CPU和坐标转换，GPU前后同步，排除磁盘读写、质量评价、绘图及三次预热。记录逐图平均与中位数。正式方法按固定顺序运行；期间同时进行文档生成和少量演示验证，背景负载、温度、调度均可能影响耗时，所以其为本机工程记录，未作为严格微基准或显著性检验。误差条为三个噪声种子的标准差，不能解释为跨数据集泛化置信区间。
+去噪时间仅覆盖滤波调用。检测计时从模型调用前开始，到预测框、分数和类别转为CPU上的NumPy数组后结束，GPU在计时前后同步；随后将xyxy转为xywh并组装预测字典的Python循环不在该区间内。磁盘读写、质量评价、绘图和三次预热均不计入耗时。记录逐图平均与中位数。正式方法按固定顺序运行；期间同时进行文档生成和少量演示验证，背景负载、温度、调度均可能影响耗时，所以其为本机工程记录，未作为严格微基准或显著性检验。误差条为三个噪声种子的标准差，不能解释为跨数据集泛化置信区间。
 
 ## 4. 实验结果与可视化
 
@@ -417,11 +418,11 @@ mAP@0.5与mAP@0.5:0.95使用官方pycocotools.COCOeval bbox、101点召回插值
 
 {table(clean_rows,["处理","AP50:95（%）","F1（%）","PSNR（dB）","SSIM"])}
 
-表1：干净对照只有一组确定输入，不计算三个噪声种子的虚假误差条。直接滤波会改变边界与纹理，必须保留该对照，才能判断算法自身带来的代价。
+表1：干净对照只有一组确定输入，不绘制跨噪声种子的误差条。直接滤波会改变边界与纹理，必须保留该对照，才能判断算法自身带来的代价。
 
 ![干净对照和时间](figures/clean_and_time.png)
 
-图2：左为干净对照AP，右为各方法跨19种输入组的去噪耗时平均。右图使用对称对数坐标，线性区间0—1 ms；柱高不能按线性比例直接比较。
+图2：左为干净对照AP，右为每种方法在7个汇总组上的平均去噪耗时，包括1个干净组及6个噪声类型与强度组合；每个噪声组先对三个种子取均值。右图使用对称对数坐标，线性区间0—1 ms；柱高不能按线性比例直接比较。
 
 ### 4.2 两类噪声和强度趋势
 
@@ -431,7 +432,7 @@ mAP@0.5与mAP@0.5:0.95使用官方pycocotools.COCOeval bbox、101点召回插值
 
 ![椒盐噪声结果](figures/salt_pepper_curves.png)
 
-图4：椒盐噪声下AP与SSIM，横轴以百分比标注。三个种子只改变噪声 realization，图像与检测器不变。
+图4：椒盐噪声下AP与SSIM，横轴以百分比标注。三个种子改变噪声的随机分布位置，图像子集与检测器保持不变。
 
 {table(best_rows,["输入","最高平均AP选项","AP50:95（%）","较不去噪Δ百分点","最高PSNR选项"])}
 
@@ -441,7 +442,7 @@ mAP@0.5与mAP@0.5:0.95使用官方pycocotools.COCOeval bbox、101点召回插值
 
 {table(moderate,["输入","方法","AP50（%）","AP50:95（%）","F1（%）","PSNR（dB）","SSIM"])}
 
-表3：均值±样本标准差。AP/F1以百分数表达，差值讨论使用百分点。完整42行汇总（6行干净＋36行噪声方法组）见aggregate_results.csv，114行独立条件见condition_results.csv。
+表3：均值±样本标准差。AP/F1以百分数表达，差值讨论使用百分点。完整42行汇总（6行干净＋36行噪声方法组）见aggregate_results.csv，114行独立条件见condition_results.csv。表中显示为0.00或0.000的标准差经过四舍五入，完整数值以CSV为准。
 
 {table(threshold_rows,["输入","方法","Precision（%）","Recall（%）","F1（%）"])}
 
@@ -457,19 +458,23 @@ PSNR惩罚每个像素误差，检测器更关心可分辨的类别与空间结�
 
 ### 4.5 案例分析：收益与代价
 
-案例选择规则在生成程序中固定：seed42、椒盐3%中值选择相对不去噪(TP−FP)变化最大的一张；高斯σ25均值选择变化最小的一张；并列按图像ID。它们是极端示例，用于展示误检漏检机制，不能代表发生比例，也不据此宣布某方法总体优越。
+案例选择规则在生成程序中固定：seed42、椒盐3%中值选择相对不去噪(TP−FP)变化最大的一张；高斯σ25均值选择变化最小的一张；若变化值相同，收益案例取较大图像ID，代价案例取较小图像ID。它们是极端示例，用于展示误检漏检机制，不能代表发生比例，也不据此宣布某方法总体优越。
 
 """
+    # 将类别计数转为文字，避免报告正文直接展示Python字典。
+    def class_counts(counts):
+        return "、".join(f"{name} {count}个" for name,count in counts.items()) or "无"
+
     for c in cases:
         d=c["direction"]; b,f=c["baseline"],c["filtered"]
         explanation=(f'本例新增{len(c["gained_matched_gt_ids"])}个真值匹配，同时失去{len(c["lost_matched_gt_ids"])}个原有匹配；总体收益不能解释为每个目标都获益。'
                      if d=="benefit" else
-                     f'本例失去{len(c["lost_matched_gt_ids"])}个原有匹配，类别为{c["lost_classes"]}。局部图中很小的轮廓被均值平滑，提示小目标证据与随机高频同时被处理；具体定位或分数变化仍应按保存的框与置信度核查。')
+                     f'本例失去{len(c["lost_matched_gt_ids"])}个原有匹配，类别为{class_counts(c["lost_classes"])}。局部图中很小的轮廓被均值平滑，提示小目标证据与随机高频同时被处理；具体定位或分数变化仍应按保存的框与置信度核查。')
         text+=f"""### 案例：COCO {c["image_id"]}，{c["noise"]}={c["level"]}，{METHOD_NAMES[c["method"]]}
 
 不去噪TP/FP/FN={b["tp"]}/{b["fp"]}/{b["fn"]}，滤波后={f["tp"]}/{f["fp"]}/{f["fn"]}；(TP−FP)变化{c["change_tp_minus_fp"]:+d}。局部裁剪坐标为{c["crop_xyxy"]}，以最小面积非crowd真值框外扩选取。所有预测框来自正式记录，未为图示重新推理。
 
-按官方匹配追踪同一真值，新增匹配类别计数为{c["gained_classes"]}，原先匹配而后失去匹配的类别计数为{c["lost_classes"]}；具体真值ID保存在analysis_summary.json。这里同时涉及定位、类别和置信度变化，不能只看清晰度或仅凭框图确定原因。
+按官方匹配追踪同一真值，新增匹配的目标为{class_counts(c["gained_classes"])}；失去原有匹配的目标为{class_counts(c["lost_classes"])}；具体真值ID保存在analysis_summary.json。这里同时涉及定位、类别和置信度变化，不能只看清晰度或仅凭框图确定原因。
 
 {explanation}
 
@@ -490,7 +495,7 @@ PSNR惩罚每个像素误差，检测器更关心可分辨的类别与空间结�
 
 {table(timings,["方法","去噪ms/张","检测ms/张","合计ms/张"])}
 
-表5：先求各输入组内的逐图平均，再对19组同权平均；噪声组先汇总三个种子。合计仅为滤波＋检测，不包含读图与报告生成。非局部均值搜索更多块，带来的开销需与检测收益一起判断；图像更复杂时NMS和预测数量也会改变检测耗时。
+表5：先求每个条件内的逐图平均，噪声条件再按三个种子汇总。每种方法最终得到7组结果（1组干净输入、6组噪声类型与强度组合），表中对这7组同权平均。合计仅为滤波＋检测，不包含读图与报告生成。非局部均值搜索更多块，带来的开销需与检测收益一起判断；图像更复杂时NMS和预测数量也会改变检测耗时。
 
 ## 5. 实际难点与处理方法
 
@@ -532,7 +537,7 @@ OpenCV使用BGR；传NumPy数组给Ultralytics时由其内部按API约定转换�
 
 ### 6.3 实验心得与后续改进
 
-这次实验让我认识到，环境检查需要覆盖完整模型推理，不能仅凭基础CUDA测试判断兼容性。比较去噪方法时，既要观察图像细节，也要结合检测指标和真值匹配分析误检、漏检。保存输入、参数和逐图预测，能在结果异常时定位原因，也便于重新计算指标和检查结论。
+实现过程中，环境兼容性、细节保留和评价匹配是最需要检查的三个环节。基础CUDA测试通过后，仍需运行完整模型确认设备兼容；比较去噪结果时，应把局部图像、检测指标和真值匹配放在一起分析。保留输入、参数及逐图预测，有助于定位异常结果，也能让后续的指标核算和案例分析有据可查。
 
 后续可在独立调参集比较窗口大小与h，在另一批图像和检测器上检验结论，再加入接近真实工况的退化。改动应使用新的输出目录，保留本次固定实验记录。
 

@@ -48,6 +48,7 @@ class RangeReader(io.RawIOBase):
         if n <= 0:
             return b""
         start = self.position
+        # zipfile可能跳读中央目录和压缩数据，每次请求都按当前位置取指定字节。
         r = requests.get(self.url, headers={"Range": f"bytes={start}-{start+n-1}"}, timeout=(15, 60))
         r.raise_for_status()
         if r.status_code != 206 or len(r.content) != n:
